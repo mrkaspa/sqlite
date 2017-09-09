@@ -40,6 +40,7 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{s: NewScanner(r)}
 }
 
+// Parse a string and produces a sentence
 func (p *Parser) Parse() (Statement, error) {
 	fn := getSentence
 	for fn != nil {
@@ -96,7 +97,7 @@ func getSentence(p *Parser) (parseFn, error) {
 	}
 }
 
-// Funcs for insert
+// Funcs for INSERT
 
 func insertSentence(p *Parser) (parseFn, error) {
 	p.stmt = &InsertStatement{}
@@ -119,34 +120,9 @@ func getTableNameInsert(p *Parser) (parseFn, error) {
 	}
 	stmt := p.stmt.(*InsertStatement)
 	stmt.TableName = lit
-	return extractColumns, nil
-}
-
-func extractColumns(p *Parser) (parseFn, error) {
-	tok, lit := p.scanIgnoreWhitespace()
-	if tok != PAR_LEFT {
-		return nil, fmt.Errorf("found %q, expected (", lit)
-	}
-	for {
-		// Read a field.
-		tok, lit := p.scanIgnoreWhitespace()
-		if tok != IDENT {
-			return nil, fmt.Errorf("found %q, expected field", lit)
-		}
-		stmt := p.stmt.(*InsertStatement)
-		stmt.Cols = append(stmt.Cols, lit)
-
-		// If the next token is not a comma then break the loop.
-		if tok, _ := p.scanIgnoreWhitespace(); tok != COMMA {
-			p.unscan()
-			break
-		}
-	}
-	tok, lit = p.scanIgnoreWhitespace()
-	if tok != PAR_RIGHT {
-		return nil, fmt.Errorf("found %q, expected )", lit)
-	}
-	return valuesKeyword, nil
+	return extractIntoParentheses(valuesKeyword, func(lits []string) {
+		stmt.Cols = lits
+	}), nil
 }
 
 func valuesKeyword(p *Parser) (parseFn, error) {
@@ -154,37 +130,42 @@ func valuesKeyword(p *Parser) (parseFn, error) {
 	if tok, lit := p.scanIgnoreWhitespace(); tok != VALUES {
 		return nil, fmt.Errorf("found %q, expected VALUES", lit)
 	}
-	return extractValues, nil
+	stmt := p.stmt.(*InsertStatement)
+	return extractIntoParentheses(nil, func(lits []string) {
+		stmt.Values = lits
+	}), nil
 }
 
-func extractValues(p *Parser) (parseFn, error) {
-	tok, lit := p.scanIgnoreWhitespace()
-	if tok != PAR_LEFT {
-		return nil, fmt.Errorf("found %q, expected (", lit)
-	}
-	for {
-		// Read a field.
+func extractIntoParentheses(nextFn parseFn, doWithLits func([]string)) parseFn {
+	return func(p *Parser) (parseFn, error) {
 		tok, lit := p.scanIgnoreWhitespace()
-		if tok != IDENT {
-			return nil, fmt.Errorf("found %q, expected field", lit)
+		if tok != PAR_LEFT {
+			return nil, fmt.Errorf("found %q, expected (", lit)
 		}
-		stmt := p.stmt.(*InsertStatement)
-		stmt.Values = append(stmt.Values, lit)
-
-		// If the next token is not a comma then break the loop.
-		if tok, _ := p.scanIgnoreWhitespace(); tok != COMMA {
-			p.unscan()
-			break
+		lits := make([]string, 0)
+		for {
+			// Read a field.
+			tok, lit := p.scanIgnoreWhitespace()
+			if tok != IDENT {
+				return nil, fmt.Errorf("found %q, expected field", lit)
+			}
+			lits = append(lits, lit)
+			// If the next token is not a comma then break the loop.
+			if tok, _ := p.scanIgnoreWhitespace(); tok != COMMA {
+				p.unscan()
+				break
+			}
 		}
+		tok, lit = p.scanIgnoreWhitespace()
+		if tok != PAR_RIGHT {
+			return nil, fmt.Errorf("found %q, expected )", lit)
+		}
+		doWithLits(lits)
+		return nextFn, nil
 	}
-	tok, lit = p.scanIgnoreWhitespace()
-	if tok != PAR_RIGHT {
-		return nil, fmt.Errorf("found %q, expected )", lit)
-	}
-	return nil, nil
 }
 
-// Funcs for instructions
+// Funcs for SELECT
 
 func selectSentence(p *Parser) (parseFn, error) {
 	p.stmt = &SelectStatement{}

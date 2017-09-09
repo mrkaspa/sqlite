@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/mrkaspa/sqlite/backend"
 )
 
 func main() {
@@ -25,12 +27,10 @@ func main() {
 			}
 		}
 
-		stmt, err := prepareStatement(text)
+		err := backend.ExecuteStatement(text)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			continue
 		}
-
-		stmt.executeStatement()
 	}
 }

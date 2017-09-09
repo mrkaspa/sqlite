@@ -1,4 +1,4 @@
-package main
+package backend
 
 import (
 	"errors"
@@ -24,11 +24,11 @@ type page struct {
 	rows          map[int]interface{}
 }
 
-var backend = &db{}
+var engine = &db{}
 
 func init() {
 	tuser := initTable("user")
-	backend.tables = append(backend.tables, tuser)
+	engine.tables = append(engine.tables, tuser)
 }
 
 func initPage(pageID int) *page {
@@ -53,7 +53,7 @@ func initTable(name string) *table {
 	}
 }
 
-func (d *db) getTable(name string) (*table, error) {
+func (d *db) GetTable(name string) (*table, error) {
 	for _, t := range d.tables {
 		if t.tableName == name {
 			return t, nil
@@ -62,7 +62,7 @@ func (d *db) getTable(name string) (*table, error) {
 	return nil, fmt.Errorf("Table %s not found", name)
 }
 
-func (t *table) insert(data map[string]string) (int, error) {
+func (t *table) Insert(data map[string]string) (int, error) {
 	p := t.pages[t.currentPageIdx]
 	if p.currentRowIdx == (pageSize - 1) {
 		np := initPage(t.currentPageIdx + 1)
