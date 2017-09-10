@@ -7,6 +7,7 @@ import (
 	"github.com/mrkaspa/sqlite/parsing"
 )
 
+// ExecuteStatement from an string
 func ExecuteStatement(text string) error {
 	parser := parsing.NewParser(strings.NewReader(text))
 	stmt, err := parser.Parse()
